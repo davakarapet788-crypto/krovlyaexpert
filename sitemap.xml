@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://YOUR-DOMAIN.github.io/</loc>
+    <lastmod>2026-07-16</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image><image:loc>https://YOUR-DOMAIN.github.io/images/og-image.webp</image:loc><image:title>Кровля.Эксперт — монтаж кровли без предоплаты</image:title></image:image>
+    <image:image><image:loc>https://YOUR-DOMAIN.github.io/images/object-01.webp</image:loc><image:caption>Дом после замены кровли, общий вид</image:caption></image:image>
+    <image:image><image:loc>https://YOUR-DOMAIN.github.io/images/object-02.webp</image:loc><image:caption>Готовая кровля из металлочерепицы</image:caption></image:image>
+    <image:image><image:loc>https://YOUR-DOMAIN.github.io/images/object-03.webp</image:loc><image:caption>Монтаж обрешётки и гидроизоляции</image:caption></image:image>
+    <image:image><image:loc>https://YOUR-DOMAIN.github.io/images/object-04.webp</image:loc><image:caption>Скаты и мансардные окна</image:caption></image:image>
+    <image:image><image:loc>https://YOUR-DOMAIN.github.io/images/object-06.webp</image:loc><image:caption>Узел примыкания у мансарды</image:caption></image:image>
+    <image:image><image:loc>https://YOUR-DOMAIN.github.io/images/material-klikfalz.webp</image:loc><image:caption>Кликфальц</image:caption></image:image>
+    <image:image><image:loc>https://YOUR-DOMAIN.github.io/images/material-composite.webp</image:loc><image:caption>Композитная металлочерепица</image:caption></image:image>
+    <image:image><image:loc>https://YOUR-DOMAIN.github.io/images/material-shingles.webp</image:loc><image:caption>Гибкая черепица</image:caption></image:image>
+    <image:image><image:loc>https://YOUR-DOMAIN.github.io/images/material-metal-tile.webp</image:loc><image:caption>Металлочерепица</image:caption></image:image>
+    <image:image><image:loc>https://YOUR-DOMAIN.github.io/images/warehouse-main-poster.webp</image:loc><image:caption>Свой склад — материалы в наличии</image:caption></image:image>
+  </url>
+</urlset>

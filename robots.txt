@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /privacy.html
+Disallow: /thanks.html
+Disallow: /404.html
+
+Sitemap: https://YOUR-DOMAIN.github.io/sitemap.xml
