@@ -43,51 +43,27 @@ function initHeader() {
 }
 
 /* ==========================================================================
-   Отправка заявок
+   Telegram lead sending — honeypot + rate-limit
    ==========================================================================
-   ДВА РЕЖИМА работы (переключается полем CONFIG.leadProxyUrl):
-
-   1) РЕКОМЕНДУЕТСЯ — через прокси (leadProxyUrl задан).
-      Токен бота НЕ лежит в этом файле и не попадает в браузер: заявка
-      уходит на ваш серверлесс-эндпоинт, а уже он пересылает её в Telegram.
-      Готовый воркер и инструкция — в файле telegram-proxy.js и в README.md.
-
-   2) ЗАПАСНОЙ — напрямую в Telegram (leadProxyUrl пустой).
-      Браузер обращается к Telegram Bot API сам. Тогда токен виден в коде —
-      это небезопасно, использовать только для быстрой проверки, не в рекламе.
-
-   ⚠️ Токен, который был здесь раньше, СКОМПРОМЕТИРОВАН (лежал в открытом
-   доступе). Обязательно перевыпустите его в @BotFather → /revoke, и новый
-   НЕ вставляйте сюда — задайте его в переменных окружения прокси.
+   ВНИМАНИЕ: сайт статический (GitHub Pages, без сервера), поэтому браузер
+   обращается к Telegram Bot API напрямую. Токен виден в этом файле —
+   подробности и план действий при злоупотреблении см. в README.md.
 */
 
-const CONFIG = {
-  // Заполните ОДИН из вариантов:
-
-  // Вариант 1 (рекомендуется): URL вашего прокси, напр. 'https://krovlya-lead.username.workers.dev'
-  leadProxyUrl: '',
-
-  // Вариант 2 (запасной, небезопасный): новый токен и chat_id прямо здесь.
-  // Оставьте пустыми, если используете прокси.
-  telegramBotToken: '',
-  telegramChatId: '',
-
-  // Номер WhatsApp для запасной связи (без + и пробелов). Меняйте вместе с телефоном на сайте.
-  whatsappNumber: '79954423347',
-};
-
+const TELEGRAM_BOT_TOKEN = '8941077440:AAEuzIbJVqMjrKoQ5GnpJVbljOcptGjKpgg';
+const TELEGRAM_CHAT_ID = '5042071687';
+const WHATSAPP_NUMBER = '79954423347';
+function waHref(){ return 'https://wa.me/'+WHATSAPP_NUMBER+'?text='+encodeURIComponent('Здравствуйте! Хочу рассчитать стоимость кровли.'); }
 const RATE_LIMIT_KEY = 'lead_last_sent_at';
 const RATE_LIMIT_MS = 30000;
 
 function isRateLimited() {
-  try {
-    const last = localStorage.getItem(RATE_LIMIT_KEY);
-    if (!last) return false;
-    return Date.now() - Number(last) < RATE_LIMIT_MS;
-  } catch (_) { return false; }
+  const last = localStorage.getItem(RATE_LIMIT_KEY);
+  if (!last) return false;
+  return Date.now() - Number(last) < RATE_LIMIT_MS;
 }
 function markSent() {
-  try { localStorage.setItem(RATE_LIMIT_KEY, String(Date.now())); } catch (_) {}
+  localStorage.setItem(RATE_LIMIT_KEY, String(Date.now()));
 }
 function escapeHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -97,22 +73,12 @@ const SOURCE_LABELS = {
   quiz: 'Квиз (расчёт сметы)',
   'hero-form': 'Быстрая форма (Hero)',
   'final-cta': 'Финальная форма',
+  calc: 'Калькулятор',
+  'mini-quiz': 'Мини-квиз',
 };
 
-// Ссылка на WhatsApp для запасного пути, если отправка не удалась
-function whatsappHref(text) {
-  const t = encodeURIComponent(text || 'Здравствуйте! Хочу рассчитать смету на монтаж кровли.');
-  return `https://wa.me/${CONFIG.whatsappNumber}?text=${t}`;
-}
-
-// Отправка конверсии в аналитику (срабатывает только если счётчик подключён)
-function trackLead(source) {
-  try { if (typeof ym === 'function' && window.__ymId) ym(window.__ymId, 'reachGoal', 'lead', { source }); } catch (_) {}
-  try { if (typeof gtag === 'function') gtag('event', 'generate_lead', { source }); } catch (_) {}
-}
-
 /**
- * Отправляет лид (через прокси или напрямую в Telegram).
+ * Отправляет лид в Telegram.
  * @param {{source:string,name:string,phone:string,honeypot?:string,details?:Object}} payload
  * @returns {Promise<void>}
  */
@@ -120,30 +86,7 @@ async function sendLead(payload) {
   if (payload.honeypot) return; // бот заполнил скрытое поле — молча игнорируем
 
   if (isRateLimited()) {
-    throw new Error('Вы недавно уже отправили заявку — мы её получили и перезвоним. Если срочно, напишите в WhatsApp.');
-  }
-
-  // Режим 1: прокси
-  if (CONFIG.leadProxyUrl) {
-    let res;
-    try {
-      res = await fetch(CONFIG.leadProxyUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-    } catch (_) {
-      throw new Error('Не удалось отправить заявку — проверьте интернет или напишите нам в WhatsApp.');
-    }
-    if (!res.ok) throw new Error('Не удалось отправить заявку. Напишите нам в WhatsApp — ответим сразу.');
-    markSent();
-    trackLead(payload.source);
-    return;
-  }
-
-  // Режим 2: напрямую в Telegram (запасной)
-  if (!CONFIG.telegramBotToken || !CONFIG.telegramChatId) {
-    throw new Error('Форма ещё не настроена. Напишите нам в WhatsApp — ответим сразу.');
+    throw new Error('Заявка уже отправлена недавно. Мы уже её получили — перезвоним в ближайшее время.');
   }
 
   const lines = [
@@ -158,20 +101,14 @@ async function sendLead(payload) {
     }
   }
 
-  let res;
-  try {
-    res = await fetch(`https://api.telegram.org/bot${CONFIG.telegramBotToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: CONFIG.telegramChatId, text: lines.join('\n'), parse_mode: 'HTML' }),
-    });
-  } catch (_) {
-    throw new Error('Не удалось отправить заявку — проверьте интернет или напишите нам в WhatsApp.');
-  }
+  const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: lines.join('\n'), parse_mode: 'HTML' }),
+  });
 
-  if (!res.ok) throw new Error('Не удалось отправить заявку. Напишите нам в WhatsApp — ответим сразу.');
+  if (!res.ok) throw new Error('Не удалось отправить заявку. Попробуйте написать в WhatsApp.');
   markSent();
-  trackLead(payload.source);
 }
 
 /* ==========================================================================
@@ -338,17 +275,6 @@ function attachPhoneMask(input) {
    Generic form handler (hero + final CTA)
    ========================================================================== */
 
-function showErrorWithWhatsApp(errorEl, message) {
-  errorEl.textContent = message + ' ';
-  const a = document.createElement('a');
-  a.href = whatsappHref();
-  a.target = '_blank';
-  a.rel = 'noopener noreferrer';
-  a.className = 'field-error-wa';
-  a.textContent = 'Написать в WhatsApp →';
-  errorEl.appendChild(a);
-}
-
 function initSimpleForm(formEl, source) {
   if (!formEl) return;
   const phoneInput = formEl.querySelector('[data-field="phone"]');
@@ -379,7 +305,7 @@ function initSimpleForm(formEl, source) {
       await sendLead({ source, name, phone, honeypot: honeypot ? honeypot.value : '' });
       window.location.href = 'thanks.html';
     } catch (err) {
-      showErrorWithWhatsApp(errorEl, err.message || 'Что-то пошло не так, попробуйте ещё раз.');
+      errorEl.innerHTML = (err.message || 'Что-то пошло не так, попробуйте ещё раз.') + ' <a class="field-error-wa" href="' + waHref() + '" target="_blank" rel="noopener">Написать в WhatsApp →</a>';
       submitBtn.disabled = false;
       submitBtn.innerHTML = submitBtn.dataset.originalText;
     }
@@ -589,13 +515,11 @@ function initQuiz() {
           <p class="quiz-contact-sub">Пришлём смету в 3 вариантах бюджета и согласуем время бесплатного выезда инженера</p>
           <input type="text" tabindex="-1" autocomplete="off" class="honeypot" data-quiz-honeypot aria-hidden="true" />
           <div class="quiz-contact-fields">
-            <input required class="field field--light" placeholder="Ваше имя" aria-label="Ваше имя" data-quiz-name />
-            <input required inputmode="tel" class="field field--light" placeholder="+7 (___) ___-__-__" aria-label="Номер телефона" data-quiz-phone value="+7" />
+            <input required class="field field--light" placeholder="Ваше имя" data-quiz-name />
+            <input required inputmode="tel" class="field field--light" placeholder="+7 (___) ___-__-__" data-quiz-phone value="+7" />
           </div>
-          <label class="consent consent--light">
-            <input type="checkbox" data-quiz-consent />
-            <span>Соглашаюсь на обработку персональных данных в соответствии с <a href="privacy.html" target="_blank" rel="noopener">политикой конфиденциальности</a></span>
-          </label>
+          <label class="consent consent--light" style="color:rgba(26,22,19,.6)"><input type="checkbox" data-quiz-consent><span>Соглашаюсь на обработку персональных данных в соответствии с <a href="privacy.html" target="_blank" rel="noopener">политикой конфиденциальности</a></span></label>
+          <p class="lead-guide-note lead-guide-note--light" style="text-align:left;margin:6px 0 0">📕 В подарок — PDF-гайд «12&nbsp;пунктов, по которым завышают смету»</p>
           <div class="quiz-contact-actions">
             <button type="submit" class="btn btn-primary" data-quiz-submit>Получить расчёт
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
@@ -620,14 +544,14 @@ function initQuiz() {
         const errorEl = stepsContainer.querySelector('[data-quiz-error]');
         const submitBtn = stepsContainer.querySelector('[data-quiz-submit]');
 
-        const consentEl = stepsContainer.querySelector('[data-quiz-consent]');
         const name = nameEl.value.trim();
         const phone = phoneEl.value.trim();
         errorEl.textContent = '';
+        const consentEl = stepsContainer.querySelector('[data-quiz-consent]');
+        if (consentEl && !consentEl.checked) { errorEl.textContent = 'Нужно согласие на обработку персональных данных'; return; }
 
         if (name.length < 2) { errorEl.textContent = 'Введите имя'; return; }
         if (phone.replace(/\D/g, '').length < 11) { errorEl.textContent = 'Введите корректный номер'; return; }
-        if (consentEl && !consentEl.checked) { errorEl.textContent = 'Нужно согласие на обработку персональных данных'; return; }
 
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="spinner"></span>';
@@ -642,10 +566,9 @@ function initQuiz() {
               'Сроки': labelFor(3, answers.timing),
             },
           });
-          currentStep = quizSteps.length + 1;
-          render();
+          window.location.href = 'thanks.html';
         } catch (err) {
-          showErrorWithWhatsApp(errorEl, err.message || 'Не получилось отправить, попробуйте ещё раз.');
+          errorEl.textContent = err.message || 'Не получилось отправить, попробуйте ещё раз.';
           submitBtn.disabled = false;
           submitBtn.innerHTML = 'Получить расчёт';
         }
@@ -763,6 +686,10 @@ function initCases() {
 
   // Карусель
   let index = 0;
+  function cardsPerView() {
+    if (window.innerWidth >= 1024) return 1 / 0.46 > 2 ? 2 : 2; // визуально ~2.2, скроллим по 1
+    return 1;
+  }
   function update() {
     const card = track.querySelector('.case-card');
     if (!card) return;
@@ -845,212 +772,122 @@ function initReveal() {
 }
 
 /* ==========================================================================
-   Галерея реального объекта — лайтбокс
-   ========================================================================== */
-
-const galleryImages = [
-  { src: 'images/object-01.webp', cap: 'Дом после замены кровли, общий вид' },
-  { src: 'images/object-02.webp', cap: 'Готовая кровля из металлочерепицы' },
-  { src: 'images/object-03.webp', cap: 'Монтаж обрешётки и гидроизоляции' },
-  { src: 'images/object-04.webp', cap: 'Скаты и мансардные окна' },
-  { src: 'images/object-05.webp', cap: 'Ендова и слуховое окно' },
-  { src: 'images/object-06.webp', cap: 'Узел примыкания у мансарды' },
-  { src: 'images/object-07.webp', cap: 'Мансардное окно крупным планом' },
-  { src: 'images/object-08.webp', cap: 'Фасад с крыльцом' },
-  { src: 'images/object-09.webp', cap: 'Фронтон и примыкание над крыльцом' },
-  { src: 'images/object-10.webp', cap: 'Карниз, подшивка и водосток' },
-  { src: 'images/object-11.webp', cap: 'Подшивка свеса софитами' },
-  { src: 'images/object-12.webp', cap: 'Водосток вдоль стены' },
-  { src: 'images/object-13.webp', cap: 'Демонтаж старого покрытия, стропильная система' },
-];
-
-function initGallery() {
-  const grid = document.querySelector('[data-gallery]');
-  if (!grid) return;
-
-  // Строим лайтбокс один раз
-  const box = document.createElement('div');
-  box.className = 'lightbox';
-  box.setAttribute('role', 'dialog');
-  box.setAttribute('aria-modal', 'true');
-  box.innerHTML = `
-    <div class="lightbox-stage">
-      <button class="lightbox-close" data-lb-close aria-label="Закрыть">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M18 6 6 18M6 6l12 12"/></svg>
-      </button>
-      <button class="lightbox-nav lightbox-nav--prev" data-lb-prev aria-label="Предыдущее фото">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 18l-6-6 6-6"/></svg>
-      </button>
-      <img class="lightbox-img" data-lb-img alt="">
-      <button class="lightbox-nav lightbox-nav--next" data-lb-next aria-label="Следующее фото">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 6l6 6-6 6"/></svg>
-      </button>
-      <p class="lightbox-caption" data-lb-cap></p>
-      <p class="lightbox-counter" data-lb-counter></p>
-    </div>`;
-  document.body.appendChild(box);
-
-  const imgEl = box.querySelector('[data-lb-img]');
-  const capEl = box.querySelector('[data-lb-cap]');
-  const counterEl = box.querySelector('[data-lb-counter]');
-  let idx = 0;
-
-  function show() {
-    const item = galleryImages[idx];
-    imgEl.src = item.src;
-    imgEl.alt = item.cap;
-    capEl.textContent = item.cap;
-    counterEl.textContent = `${idx + 1} / ${galleryImages.length}`;
-  }
-  function open(i) {
-    idx = i;
-    show();
-    box.classList.add('is-open');
-    document.body.style.overflow = 'hidden';
-  }
-  function close() {
-    box.classList.remove('is-open');
-    document.body.style.overflow = '';
-  }
-  const next = () => { idx = (idx + 1) % galleryImages.length; show(); };
-  const prev = () => { idx = (idx - 1 + galleryImages.length) % galleryImages.length; show(); };
-
-  grid.querySelectorAll('[data-gallery-index]').forEach((tile) => {
-    tile.addEventListener('click', (e) => {
-      e.preventDefault();
-      open(Number(tile.dataset.galleryIndex));
-    });
-  });
-
-  box.querySelector('[data-lb-close]').addEventListener('click', close);
-  box.querySelector('[data-lb-next]').addEventListener('click', next);
-  box.querySelector('[data-lb-prev]').addEventListener('click', prev);
-  // Клик по фону (не по фото/кнопкам) — закрыть
-  box.addEventListener('click', (e) => { if (e.target === box) close(); });
-
-  document.addEventListener('keydown', (e) => {
-    if (!box.classList.contains('is-open')) return;
-    if (e.key === 'Escape') close();
-    else if (e.key === 'ArrowRight') next();
-    else if (e.key === 'ArrowLeft') prev();
-  });
-
-  // Свайпы на мобильных
-  let startX = null;
-  box.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
-  box.addEventListener('touchend', (e) => {
-    if (startX === null) return;
-    const dx = e.changedTouches[0].clientX - startX;
-    if (Math.abs(dx) > 50) { dx < 0 ? next() : prev(); }
-    startX = null;
-  }, { passive: true });
-}
-
-/* ==========================================================================
-   Склад — автоплей главного видео в кадре + видео-лайтбокс
-   ========================================================================== */
-
-const warehouseVideos = [
-  { src: 'videos/warehouse-1.mp4', cap: 'Наш склад — обход, материалы в наличии' },
-  { src: 'videos/warehouse-2.mp4', cap: 'Склад: материалы и комплектующие' },
-  { src: 'videos/warehouse-3.mp4', cap: 'Материалы перед отправкой на объект' },
-  { src: 'videos/warehouse-4.mp4', cap: 'Склад — материалы свои' },
-];
-
-function initWarehouse() {
-  const root = document.querySelector('[data-warehouse]');
-  const mainVideo = document.querySelector('[data-wh-main]');
-  if (!root && !mainVideo) return;
-
-  // Главное видео: грузим и играем только когда видно на экране (экономим трафик)
-  if (mainVideo && 'IntersectionObserver' in window) {
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          mainVideo.play().catch(() => {});
-        } else {
-          mainVideo.pause();
-        }
-      });
-    }, { threshold: 0.35 });
-    io.observe(mainVideo);
-  } else if (mainVideo) {
-    mainVideo.setAttribute('autoplay', '');
-  }
-
-  if (!root) return;
-
-  // Видео-лайтбокс
-  const box = document.createElement('div');
-  box.className = 'lightbox';
-  box.setAttribute('role', 'dialog');
-  box.setAttribute('aria-modal', 'true');
-  box.innerHTML = `
-    <div class="lightbox-stage">
-      <button class="lightbox-close" data-vlb-close aria-label="Закрыть">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M18 6 6 18M6 6l12 12"/></svg>
-      </button>
-      <button class="lightbox-nav lightbox-nav--prev" data-vlb-prev aria-label="Предыдущее видео">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 18l-6-6 6-6"/></svg>
-      </button>
-      <video class="lightbox-video" data-vlb-video controls playsinline preload="metadata"></video>
-      <button class="lightbox-nav lightbox-nav--next" data-vlb-next aria-label="Следующее видео">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 6l6 6-6 6"/></svg>
-      </button>
-      <p class="lightbox-caption" data-vlb-cap></p>
-      <p class="lightbox-counter" data-vlb-counter></p>
-    </div>`;
-  document.body.appendChild(box);
-
-  const videoEl = box.querySelector('[data-vlb-video]');
-  const capEl = box.querySelector('[data-vlb-cap]');
-  const counterEl = box.querySelector('[data-vlb-counter]');
-  let idx = 0;
-
-  function show() {
-    const item = warehouseVideos[idx];
-    videoEl.src = item.src;
-    videoEl.play().catch(() => {});
-    capEl.textContent = item.cap;
-    counterEl.textContent = `${idx + 1} / ${warehouseVideos.length}`;
-  }
-  function open(i) {
-    idx = i;
-    if (mainVideo) mainVideo.pause();
-    show();
-    box.classList.add('is-open');
-    document.body.style.overflow = 'hidden';
-  }
-  function close() {
-    box.classList.remove('is-open');
-    videoEl.pause();
-    videoEl.removeAttribute('src');
-    videoEl.load();
-    document.body.style.overflow = '';
-  }
-  const next = () => { idx = (idx + 1) % warehouseVideos.length; show(); };
-  const prev = () => { idx = (idx - 1 + warehouseVideos.length) % warehouseVideos.length; show(); };
-
-  root.querySelectorAll('[data-wh-index]').forEach((thumb) => {
-    thumb.addEventListener('click', () => open(Number(thumb.dataset.whIndex)));
-  });
-  box.querySelector('[data-vlb-close]').addEventListener('click', close);
-  box.querySelector('[data-vlb-next]').addEventListener('click', next);
-  box.querySelector('[data-vlb-prev]').addEventListener('click', prev);
-  box.addEventListener('click', (e) => { if (e.target === box) close(); });
-  document.addEventListener('keydown', (e) => {
-    if (!box.classList.contains('is-open')) return;
-    if (e.key === 'Escape') close();
-    else if (e.key === 'ArrowRight') next();
-    else if (e.key === 'ArrowLeft') prev();
-  });
-}
-
-/* ==========================================================================
    Init
    ========================================================================== */
 
+/* ==========================================================================
+   Кейсы с ценами (2-й блок) + лайтбокс объекта
+   ========================================================================== */
+const pcasesData = [
+  {type:'Дача · металлочерепица',title:'Замена кровли после протечек',before:'images/case-1-before.webp',after:'images/case-1-after.webp',
+   price:'480 000 ₽',did:'Демонтаж, гидроизоляция, новая металлочерепица',area:'120 м²',term:'8 дней',res:'Сухой чердак, правильный пирог'},
+  {type:'Новый дом · гибкая черепица',title:'Монтаж кровли под ключ',after:'images/case-3-full.webp',
+   price:'540 000 ₽',did:'Полный цикл от стропил до финиша',area:'160 м²',term:'10 дней',res:'Сдали под ключ, приёмка по этапам'},
+  {type:'Дом · кликфальц',title:'Замена кровли без ущерба фасаду',after:'images/case-4-after.webp',
+   price:'620 000 ₽',did:'Кликфальц, защита фасада плёнкой, вывоз мусора',area:'140 м²',term:'9 дней',res:'Сдали за 9 дней вместо 12'},
+  {type:'Дом · композитная черепица',title:'Реконструкция вальмовой кровли',before:'images/case-2-before.webp',after:'images/case-2-after.webp',
+   price:'760 000 ₽',did:'Новый пирог, узлы примыкания, утепление',area:'180 м²',term:'12 дней',res:'Ушли промерзание и наледь'},
+];
+function initPricedCases() {
+  const el = document.querySelector('[data-pcases]'); if (!el) return;
+  el.innerHTML = pcasesData.map(c => `
+    <div class="pcase reveal">
+      <div class="pcase-imgs ${c.before ? '' : 'single'}">
+        ${c.before ? `<div class="pba" style="background-image:url('${c.before}')"><span class="pba-tag">Было</span></div>` : ''}
+        <div class="pba" style="background-image:url('${c.after}')"><span class="pba-tag after">Стало</span></div>
+      </div>
+      <div class="pcase-body">
+        <p class="pchip">${c.type}</p>
+        <h3>${c.title}</h3>
+        <div class="pcase-price"><span class="lbl">Стоимость под ключ</span><span class="val">${c.price}</span></div>
+        <ul class="pcase-rows">
+          <li><span class="k">Что сделали</span><span class="v">${c.did}</span></li>
+          <li><span class="k">Площадь</span><span class="v">${c.area}</span></li>
+          <li><span class="k">Срок</span><span class="v">${c.term}</span></li>
+          <li><span class="k">Результат</span><span class="v res">${c.res}</span></li>
+        </ul>
+      </div>
+    </div>`).join('');
+}
+
+const OGAL = Array.from({length:13}, (_,i) => 'images/object-'+String(i+1).padStart(2,'0')+'.webp');
+function initObjectGallery() {
+  const grid = document.querySelector('[data-gallery]'), lb = document.querySelector('[data-olb]');
+  if (!grid || !lb) return;
+  const img = lb.querySelector('[data-olb-img]'), cap = lb.querySelector('[data-olb-cap]'); let i = 0;
+  const show = () => { img.src = OGAL[i]; cap.textContent = (i+1)+' / '+OGAL.length; };
+  const open = n => { i = n; show(); lb.classList.add('open'); document.body.style.overflow = 'hidden'; };
+  const close = () => { lb.classList.remove('open'); document.body.style.overflow = ''; };
+  const next = () => { i = (i+1) % OGAL.length; show(); }, prev = () => { i = (i-1+OGAL.length) % OGAL.length; show(); };
+  grid.querySelectorAll('[data-gi]').forEach(b => b.addEventListener('click', () => open(+b.dataset.gi)));
+  lb.querySelector('[data-olb-x]').onclick = close;
+  lb.querySelector('[data-olb-next]').onclick = next;
+  lb.querySelector('[data-olb-prev]').onclick = prev;
+  lb.addEventListener('click', e => { if (e.target === lb) close(); });
+  document.addEventListener('keydown', e => { if (!lb.classList.contains('open')) return; if (e.key==='Escape') close(); if (e.key==='ArrowRight') next(); if (e.key==='ArrowLeft') prev(); });
+  let sx = null;
+  lb.addEventListener('touchstart', e => sx = e.touches[0].clientX, {passive:true});
+  lb.addEventListener('touchend', e => { if (sx===null) return; const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx)>50) dx<0?next():prev(); sx=null; }, {passive:true});
+}
+
+/* ==========================================================================
+   Срочность — месяц подставляется автоматически (обновляется каждый месяц)
+   ========================================================================== */
+const URG_MONTHS = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+function initUrgency() {
+  const m = URG_MONTHS[new Date().getMonth()];
+  document.querySelectorAll('[data-urg-month]').forEach(e => { e.textContent = m; });
+}
+
+/* ==========================================================================
+   Встроенные лид-формы калькулятора и мини-квиза → отправка → thanks.html
+   ========================================================================== */
+function initLeadInline() {
+  document.querySelectorAll('[data-leadform]').forEach((formEl) => {
+    const source = formEl.dataset.leadform;
+    const nameInput = formEl.querySelector('[data-field="name"]');
+    const phoneInput = formEl.querySelector('[data-field="phone"]');
+    const consent = formEl.querySelector('[data-consent]');
+    const honeypot = formEl.querySelector('[data-field="honeypot"]');
+    const submitBtn = formEl.querySelector('[data-submit]');
+    const errorEl = formEl.querySelector('[data-error]');
+    if (phoneInput) attachPhoneMask(phoneInput);
+
+    formEl.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorEl.textContent = '';
+      const name = nameInput.value.trim();
+      const phone = phoneInput.value.trim();
+      if (name.length < 2) { errorEl.textContent = 'Введите имя'; return; }
+      if (phone.replace(/\D/g, '').length < 11) { errorEl.textContent = 'Введите корректный номер'; return; }
+      if (consent && !consent.checked) { errorEl.textContent = 'Нужно согласие на обработку персональных данных'; return; }
+
+      const details = {};
+      if (source === 'calc') {
+        const mn = document.querySelector('[data-calc-result-min]'), mx = document.querySelector('[data-calc-result-max]');
+        if (mn && mx) details['Расчёт на сайте'] = `от ${mn.textContent} до ${mx.textContent} ₽`;
+      } else if (source === 'mini-quiz') {
+        const mn = document.querySelector('[data-mq-min]'), mx = document.querySelector('[data-mq-max]');
+        if (mn && mx) details['Оценка (мини-квиз)'] = `от ${mn.textContent} до ${mx.textContent} ₽`;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.dataset.o = submitBtn.dataset.o || submitBtn.innerHTML;
+      submitBtn.innerHTML = '<span class="spinner"></span>';
+      try {
+        await sendLead({ source, name, phone, honeypot: honeypot ? honeypot.value : '', details });
+        window.location.href = 'thanks.html';
+      } catch (err) {
+        errorEl.innerHTML = (err.message || 'Что-то пошло не так.') + ' <a class="field-error-wa" href="' + waHref() + '" target="_blank" rel="noopener">Написать в WhatsApp →</a>';
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = submitBtn.dataset.o;
+      }
+    });
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  initUrgency();
   initHeader();
   initSimpleForm(document.querySelector('[data-form="hero"]'), 'hero-form');
   initSimpleForm(document.querySelector('[data-form="final-cta"]'), 'final-cta');
@@ -1058,9 +895,10 @@ document.addEventListener('DOMContentLoaded', () => {
   initQuiz();
   initMiniQuiz();
   initCalculator();
+  initLeadInline();
   initCases();
-  initGallery();
-  initWarehouse();
+  initPricedCases();
+  initObjectGallery();
   initFaq();
   initStickyCta();
   initReveal();
