@@ -433,7 +433,7 @@ input { font: inherit; color: inherit; }
   left: 0;
   right: 0;
   background: var(--ink);
-  padding: 88px 24px 40px;
+  padding: 16px 24px 40px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -2941,3 +2941,26 @@ a.footer-contact-item:hover { color: var(--gold-light); }
 .thanks-guide-body p { font-size: 13px; color: rgba(251,248,242,0.6); margin: 0; }
 .thanks-guide .btn { margin-top: 0; white-space: nowrap; }
 @media (max-width: 520px){ .thanks-guide { flex-direction: column; text-align: center; } }
+
+/* Верхняя строка мобильного меню: логотип + крестик */
+.header-mobile-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ink-line);
+}
+.header-mobile-top .header-logo { color: var(--cream); }
+.header-mobile-close {
+  width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--ink-line);
+  border-radius: 50%;
+  color: var(--cream);
+  cursor: pointer;
+  transition: background 0.25s var(--ease-lux);
+  flex: 0 0 auto;
+}
+.header-mobile-close:hover { background: rgba(255,255,255,0.14); }

@@ -28,10 +28,14 @@ function initHeader() {
 
     burger.addEventListener('click', () => toggleMenu());
 
-    // Клик по ссылке в меню — закрываем
+    // Клик по ссылке в меню (в т.ч. по логотипу) — закрываем
     mobileMenu.querySelectorAll('a').forEach((link) => {
       link.addEventListener('click', () => toggleMenu(false));
     });
+
+    // Крестик — закрываем
+    const closeBtn = mobileMenu.querySelector('[data-mobile-close]');
+    if (closeBtn) closeBtn.addEventListener('click', () => toggleMenu(false));
 
     // Esc — закрываем
     document.addEventListener('keydown', (e) => {
