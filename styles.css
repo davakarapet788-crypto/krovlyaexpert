@@ -2964,3 +2964,25 @@ a.footer-contact-item:hover { color: var(--gold-light); }
   flex: 0 0 auto;
 }
 .header-mobile-close:hover { background: rgba(255,255,255,0.14); }
+
+/* --- Фиксы мобильного меню: целый светлый логотип + белый крестик --- */
+.header-mobile-menu .header-mobile-top .header-logo {
+  padding: 0 !important;
+  border-bottom: 0 !important;
+  transform: none !important;
+  font-size: 20px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.header-mobile-menu .header-logo,
+.header-mobile-menu .header-logo .header-logo-text { color: var(--cream) !important; }
+.header-mobile-menu .header-logo-text { white-space: nowrap; }
+.header-mobile-menu .header-logo-text em { color: var(--gold) !important; }
+
+.header-mobile-close {
+  color: #fff !important;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.28);
+}
+.header-mobile-close svg { stroke: #fff; }
+.header-mobile-close:hover { background: rgba(255,255,255,0.20); }
