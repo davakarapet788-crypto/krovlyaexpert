@@ -66,11 +66,11 @@ const TELEGRAM_CHAT_IDS = [
 
 const WHATSAPP_NUMBER = '79954423347';
 const TELEGRAM_PHONE = '+79954423347';
-// EmailJS — отправка заявок на почту (без активации, работает сразу)
-const EMAILJS_PUBLIC_KEY  = 'EfO3mpQ2t4cZL1u8I';
-const EMAILJS_SERVICE_ID  = 'service_6ji47k9';
-const EMAILJS_TEMPLATE_ID = 'template_7bv8gqp';
-const LEAD_EMAILS = ['7459715@mail.ru', 'mihaiwladyslaw@yandex.ru'];  // адреса получателей
+// Почты для дублирования заявок (FormSubmit — подтвердите активацию на каждом адресе)
+const LEAD_EMAILS = [
+  '7459715@mail.ru',
+  'mihaiwladyslaw@yandex.ru',
+];
 function waHref(){ return 'https://wa.me/'+WHATSAPP_NUMBER+'?text='+encodeURIComponent('Здравствуйте! Хочу рассчитать стоимость кровли.'); }
 const RATE_LIMIT_KEY = 'lead_last_sent_at';
 const RATE_LIMIT_MS = 30000;
@@ -134,25 +134,23 @@ async function sendLead(payload) {
   ).then((results) => results.some(Boolean)); // успех, если хоть одно сообщение ушло
 
   // 2) Email — дублирование заявки на почту
-  // 2) Email через EmailJS — отправляем на все адреса из LEAD_EMAILS
-  const ejsParams = {
-    name:    payload.name,
-    phone:   payload.phone,
-    source:  SOURCE_LABELS[payload.source] || payload.source,
-    details: details.join(' · ') || '—',
-    time:    new Date().toLocaleString('ru-RU'),
-  };
+  // 2) Email через FormSubmit — дублирование на все адреса
+  const mailBody = JSON.stringify({
+    _subject: `Заявка с сайта — ${SOURCE_LABELS[payload.source] || payload.source}`,
+    _template: 'table',
+    _captcha: 'false',
+    'Имя': payload.name,
+    'Телефон': payload.phone,
+    'Источник': SOURCE_LABELS[payload.source] || payload.source,
+    'Детали': details.join(' · ') || '—',
+    'Время': new Date().toLocaleString('ru-RU'),
+  });
   const mailPromise = Promise.all(
-    LEAD_EMAILS.map((toEmail) =>
-      fetch('https://api.emailjs.com/api/v1.0/email/send', {
+    LEAD_EMAILS.map((email) =>
+      fetch('https://formsubmit.co/ajax/' + email, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          service_id:  EMAILJS_SERVICE_ID,
-          template_id: EMAILJS_TEMPLATE_ID,
-          user_id:     EMAILJS_PUBLIC_KEY,
-          template_params: { ...ejsParams, to_email: toEmail },
-        }),
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: mailBody,
       }).then((r) => r.ok).catch(() => false)
     )
   ).then((results) => results.some(Boolean));
