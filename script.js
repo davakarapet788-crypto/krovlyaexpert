@@ -66,8 +66,12 @@ const TELEGRAM_CHAT_IDS = [
 
 const WHATSAPP_NUMBER = '79954423347';
 const TELEGRAM_PHONE = '+79954423347';
-const LEAD_EMAIL = '7459715@mail.ru';
-const EMAIL_ENDPOINT = 'https://formsubmit.co/ajax/' + LEAD_EMAIL;
+// Все почты для дублирования заявок (FormSubmit — одна активация на адрес)
+// ⚠️ На каждый новый адрес придёт письмо активации — нужно перейти по ссылке
+const LEAD_EMAILS = [
+  '7459715@mail.ru',          // основная
+  'mihaiwladyslaw@yandex.ru', // дополнительная
+];
 function waHref(){ return 'https://wa.me/'+WHATSAPP_NUMBER+'?text='+encodeURIComponent('Здравствуйте! Хочу рассчитать стоимость кровли.'); }
 const RATE_LIMIT_KEY = 'lead_last_sent_at';
 const RATE_LIMIT_MS = 30000;
@@ -131,20 +135,26 @@ async function sendLead(payload) {
   ).then((results) => results.some(Boolean)); // успех, если хоть одно сообщение ушло
 
   // 2) Email — дублирование заявки на почту
-  const mailPromise = fetch(EMAIL_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({
-      _subject: `Заявка с сайта — ${SOURCE_LABELS[payload.source] || payload.source}`,
-      _template: 'table',
-      _captcha: 'false',
-      'Имя': payload.name,
-      'Телефон': payload.phone,
-      'Источник': SOURCE_LABELS[payload.source] || payload.source,
-      'Детали': details.join(' · ') || '—',
-      'Время': new Date().toLocaleString('ru-RU'),
-    }),
-  }).then((r) => r.ok).catch(() => false);
+  // 2) Email — дублирование на все адреса из массива LEAD_EMAILS
+  const mailBody = JSON.stringify({
+    _subject: `Заявка с сайта — ${SOURCE_LABELS[payload.source] || payload.source}`,
+    _template: 'table',
+    _captcha: 'false',
+    'Имя': payload.name,
+    'Телефон': payload.phone,
+    'Источник': SOURCE_LABELS[payload.source] || payload.source,
+    'Детали': details.join(' · ') || '—',
+    'Время': new Date().toLocaleString('ru-RU'),
+  });
+  const mailPromise = Promise.all(
+    LEAD_EMAILS.map((email) =>
+      fetch('https://formsubmit.co/ajax/' + email, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: mailBody,
+      }).then((r) => r.ok).catch(() => false)
+    )
+  ).then((results) => results.some(Boolean));
 
   const [tgOk, mailOk] = await Promise.all([tgPromise, mailPromise]);
 
