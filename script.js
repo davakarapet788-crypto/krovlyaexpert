@@ -55,12 +55,18 @@ function initHeader() {
 */
 
 const TELEGRAM_BOT_TOKEN = '8815584196:AAGTzYfqlgpf2ZsIBDqO8DioUXIqIU7ErAA';
-const TELEGRAM_CHAT_ID = '5065897318';
+
+// Все чаты, куда бот шлёт заявки одновременно.
+// Чтобы добавить получателя — просто допиши его chat_id в массив.
+// Чтобы узнать свой chat_id — напиши боту @userinfobot в Telegram.
+const TELEGRAM_CHAT_IDS = [
+  '5065897318',  // Владислав (владелец)
+  '5042071687',  // дополнительный получатель
+];
+
 const WHATSAPP_NUMBER = '79954423347';
-const TELEGRAM_PHONE = '+79954423347';           // Telegram по номеру телефона
-const LEAD_EMAIL = '7459715@mail.ru';            // дублирование заявок на почту
-// Эндпоинт отправки на почту без сервера (FormSubmit).
-// ⚠️ ПЕРВУЮ заявку нужно подтвердить: на почту придёт письмо от FormSubmit со ссылкой активации.
+const TELEGRAM_PHONE = '+79954423347';
+const LEAD_EMAIL = '7459715@mail.ru';
 const EMAIL_ENDPOINT = 'https://formsubmit.co/ajax/' + LEAD_EMAIL;
 function waHref(){ return 'https://wa.me/'+WHATSAPP_NUMBER+'?text='+encodeURIComponent('Здравствуйте! Хочу рассчитать стоимость кровли.'); }
 const RATE_LIMIT_KEY = 'lead_last_sent_at';
@@ -113,12 +119,16 @@ async function sendLead(payload) {
     ...details.map((d) => escapeHtml(d)),
   ];
 
-  // 1) Telegram
-  const tgPromise = fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: lines.join('\n'), parse_mode: 'HTML' }),
-  }).then((r) => r.ok).catch(() => false);
+  // 1) Telegram — шлём одновременно во все chat_id из массива TELEGRAM_CHAT_IDS
+  const tgPromise = Promise.all(
+    TELEGRAM_CHAT_IDS.map((chatId) =>
+      fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: lines.join('\n'), parse_mode: 'HTML' }),
+      }).then((r) => r.ok).catch(() => false)
+    )
+  ).then((results) => results.some(Boolean)); // успех, если хоть одно сообщение ушло
 
   // 2) Email — дублирование заявки на почту
   const mailPromise = fetch(EMAIL_ENDPOINT, {
