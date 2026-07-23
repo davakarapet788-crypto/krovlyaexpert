@@ -1,6 +1,7 @@
 User-agent: *
 Allow: /
 Disallow: /privacy.html
+Disallow: /consent.html
 Disallow: /thanks.html
 Disallow: /404.html
 

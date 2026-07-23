@@ -54,9 +54,14 @@ function initHeader() {
    подробности и план действий при злоупотреблении см. в README.md.
 */
 
-const TELEGRAM_BOT_TOKEN = '8941077440:AAEuzIbJVqMjrKoQ5GnpJVbljOcptGjKpgg';
-const TELEGRAM_CHAT_ID = '5042071687';
+const TELEGRAM_BOT_TOKEN = '8815584196:AAGTzYfqlgpf2ZsIBDqO8DioUXIqIU7ErAA';
+const TELEGRAM_CHAT_ID = '5065897318';
 const WHATSAPP_NUMBER = '79954423347';
+const TELEGRAM_PHONE = '+79954423347';           // Telegram по номеру телефона
+const LEAD_EMAIL = '7459715@mail.ru';            // дублирование заявок на почту
+// Эндпоинт отправки на почту без сервера (FormSubmit).
+// ⚠️ ПЕРВУЮ заявку нужно подтвердить: на почту придёт письмо от FormSubmit со ссылкой активации.
+const EMAIL_ENDPOINT = 'https://formsubmit.co/ajax/' + LEAD_EMAIL;
 function waHref(){ return 'https://wa.me/'+WHATSAPP_NUMBER+'?text='+encodeURIComponent('Здравствуйте! Хочу рассчитать стоимость кровли.'); }
 const RATE_LIMIT_KEY = 'lead_last_sent_at';
 const RATE_LIMIT_MS = 30000;
@@ -93,25 +98,48 @@ async function sendLead(payload) {
     throw new Error('Заявка уже отправлена недавно. Мы уже её получили — перезвоним в ближайшее время.');
   }
 
+  const details = [];
+  if (payload.details) {
+    for (const [key, value] of Object.entries(payload.details)) {
+      if (value) details.push(`${key}: ${value}`);
+    }
+  }
+
   const lines = [
     '🏠 <b>Новая заявка — Кровля.Эксперт</b>',
     `Источник: ${SOURCE_LABELS[payload.source] || payload.source}`,
     `Имя: ${escapeHtml(payload.name)}`,
     `Телефон: ${escapeHtml(payload.phone)}`,
+    ...details.map((d) => escapeHtml(d)),
   ];
-  if (payload.details) {
-    for (const [key, value] of Object.entries(payload.details)) {
-      if (value) lines.push(`${escapeHtml(key)}: ${escapeHtml(value)}`);
-    }
-  }
 
-  const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+  // 1) Telegram
+  const tgPromise = fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: lines.join('\n'), parse_mode: 'HTML' }),
-  });
+  }).then((r) => r.ok).catch(() => false);
 
-  if (!res.ok) throw new Error('Не удалось отправить заявку. Попробуйте написать в WhatsApp.');
+  // 2) Email — дублирование заявки на почту
+  const mailPromise = fetch(EMAIL_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      _subject: `Заявка с сайта — ${SOURCE_LABELS[payload.source] || payload.source}`,
+      _template: 'table',
+      _captcha: 'false',
+      'Имя': payload.name,
+      'Телефон': payload.phone,
+      'Источник': SOURCE_LABELS[payload.source] || payload.source,
+      'Детали': details.join(' · ') || '—',
+      'Время': new Date().toLocaleString('ru-RU'),
+    }),
+  }).then((r) => r.ok).catch(() => false);
+
+  const [tgOk, mailOk] = await Promise.all([tgPromise, mailPromise]);
+
+  // Успех, если заявка ушла хотя бы одним каналом
+  if (!tgOk && !mailOk) throw new Error('Не удалось отправить заявку. Попробуйте написать в WhatsApp.');
   markSent();
 }
 
@@ -522,7 +550,7 @@ function initQuiz() {
             <input required class="field field--light" placeholder="Ваше имя" data-quiz-name />
             <input required inputmode="tel" class="field field--light" placeholder="+7 (___) ___-__-__" data-quiz-phone value="+7" />
           </div>
-          <label class="consent consent--light" style="color:rgba(26,22,19,.6)"><input type="checkbox" data-quiz-consent><span>Соглашаюсь на обработку персональных данных в соответствии с <a href="privacy.html" target="_blank" rel="noopener">политикой конфиденциальности</a></span></label>
+          <label class="consent consent--light" style="color:rgba(26,22,19,.6)"><input type="checkbox" data-quiz-consent><span>Даю <a href="consent.html" target="_blank" rel="noopener">согласие на обработку персональных данных</a> и принимаю <a href="privacy.html" target="_blank" rel="noopener">политику</a></span></label>
           <p class="lead-guide-note lead-guide-note--light" style="text-align:left;margin:6px 0 0">📕 В подарок — PDF-гайд «12&nbsp;пунктов, по которым завышают смету»</p>
           <div class="quiz-contact-actions">
             <button type="submit" class="btn btn-primary" data-quiz-submit>Получить расчёт
